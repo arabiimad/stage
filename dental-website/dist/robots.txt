@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://dentaltech-pro.fr/sitemap.xml
+
+# Disallow admin and private areas
+Disallow: /admin/
+Disallow: /api/
+Disallow: /private/
+
+# Allow important pages
+Allow: /
+Allow: /boutique
+Allow: /product/*
+Allow: /contact
+
+# Crawl delay (optional)
+Crawl-delay: 1
+
