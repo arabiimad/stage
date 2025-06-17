@@ -42,13 +42,13 @@ jobs:
     - name: Set up PNPM
       uses: pnpm/action-setup@v3 # Use v3 or latest compatible
       with:
-        version: 8 # Match your project's pnpm version (e.g., from package.json "packageManager")
-        run_install: false
+        version: 10 # Changed from 8 to 10, matching project's packageManager field
+        run_install: false # run_install is false, install is a separate step
     - name: Get pnpm store directory
       id: pnpm-store
       shell: bash
       run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+        echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT # Removed --silent for potential debug info if needed
     - name: Setup pnpm cache
       uses: actions/cache@v4
       with:
@@ -94,13 +94,13 @@ jobs:
   #       node-version: '18'
   #   - uses: pnpm/action-setup@v3
   #     with:
-  #       version: 8
+  #       version: 10 # Also update here if/when tests are enabled
   #       run_install: false
   #   - name: Get pnpm store directory
   #     id: pnpm-store-test # Unique id for this step
   #     shell: bash
   #     run: |
-  #       echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+  #       echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
   #   - name: Setup pnpm cache for tests
   #     uses: actions/cache@v4
   #     with:
