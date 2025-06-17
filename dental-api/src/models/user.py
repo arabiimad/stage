@@ -13,13 +13,22 @@ class User(db.Model):
     # orders backref is added by Order model
 
     def set_password(self, password):
-        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+        # Ensure password is a string
+        if not isinstance(password, str):
+            raise TypeError("Password must be a string")
+        # Encode password to bytes, generate salt, hash, then decode hash back to string for DB storage
+        salt = bcrypt.gensalt()
+        self.password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
     def check_password(self, password):
-        # Ensure password_hash is not None and is a string
-        if self.password_hash is None or not isinstance(self.password_hash, str):
+        # Ensure password_hash is not None and is a string (already stored as string)
+        if self.password_hash is None: # Should not happen if nullable=False
             return False
-        return bcrypt.check_password_hash(self.password_hash.encode('utf-8'), password.encode('utf-8'))
+        if not isinstance(password, str): # Ensure input password is a string
+            return False
+
+        # Encode both password to check and stored hash to bytes for bcrypt.checkpw
+        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
 
     def __repr__(self):
         return f'<User {self.username}>'

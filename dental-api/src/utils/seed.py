@@ -36,15 +36,26 @@ def seed_all():
 
         # 1. Seed Admin User
         print("Seeding admin user...")
-        admin_password = "adminpass"
-        admin_user = User(
-            username='admin',
-            email='admin@dentaltech.pro',
-            role='admin'
-        )
-        admin_user.set_password(admin_password)
-        db.session.add(admin_user)
-        print(f"Admin user '{admin_user.username}' prepared.")
+        admin_email = 'admin@dentaltech.pro'
+        admin_password = 'Admin123!' # New password as per instructions
+
+        admin_user = User.query.filter_by(email=admin_email).first()
+        if not admin_user:
+            admin_user = User(
+                username='admin',
+                email=admin_email,
+                role='admin'
+            )
+            admin_user.set_password(admin_password)
+            db.session.add(admin_user)
+            print(f"Admin user '{admin_user.username}' created with new password.")
+        else:
+            # Optionally update existing admin's password and role, or just ensure they exist
+            admin_user.set_password(admin_password) # Ensure password is set to the defined one
+            admin_user.role = 'admin' # Ensure role is admin
+            print(f"Admin user '{admin_user.username}' already exists. Password updated and role ensured.")
+
+        print(f"Admin user '{admin_user.username}' (role: {admin_user.role}) configured.")
 
         # 2. Seed Products
         print("Seeding products...")

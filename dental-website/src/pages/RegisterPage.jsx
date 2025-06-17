@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; // Keep useState for registrationSuccess
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner'; // Import toast
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,43 +12,56 @@ const RegisterPage = () => {
     const { register: formRegister, handleSubmit, formState: { errors }, watch } = useForm();
     const { register: authRegister, loading } = useAuth();
     const navigate = useNavigate();
-    const [apiError, setApiError] = useState('');
+    // const [apiError, setApiError] = useState(''); // Removed apiError state
     const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
     // Watch password for confirmation
     const password = watch('password');
 
     const onSubmit = async (data) => {
-        setApiError('');
-        setRegistrationSuccess(false);
+        // setApiError(''); // No longer needed
+        setRegistrationSuccess(false); // Reset success state on new submission
         try {
-            await authRegister(data.username, data.email, data.password);
+            const response = await authRegister(data.username, data.email, data.password);
+            // Assuming backend returns a success message or user details
+            toast.success(response?.data?.msg || 'Inscription réussie! Vous pouvez maintenant vous connecter.');
             setRegistrationSuccess(true);
-            // Optionally navigate to login after a short delay or let user click a link
+
+            // Keep the redirect to login page after a delay
             setTimeout(() => {
                 navigate('/login');
-            }, 3000); // Redirect after 3 seconds
+            }, 3000);
         } catch (error) {
-            setApiError(error.response?.data?.message || 'Registration failed. Please try again.');
+            let friendlyErrorMessage = "L'inscription a échoué. Veuillez réessayer.";
+            // Backend error messages are usually in error.response.data.msg or error.response.data.message
+            if (error.response && error.response.data && (error.response.data.msg || error.response.data.message)) {
+              friendlyErrorMessage = error.response.data.msg || error.response.data.message;
+            } else if (error.message && !error.response) { // Network errors or other issues
+              friendlyErrorMessage = `Échec de l'inscription: ${error.message}`;
+            }
+            toast.error(friendlyErrorMessage);
+            // setApiError(friendlyErrorMessage); // No longer needed
         }
     };
 
     if (registrationSuccess) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+            <div className="flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4">
                 <Card className="w-full max-w-md p-6 text-center">
                     <CardTitle className="text-2xl font-bold text-green-600">Inscription Réussie!</CardTitle>
                     <CardDescription className="mt-2">
-                        Votre compte a été créé avec succès. Vous allez être redirigé vers la page de connexion.
+                        Votre compte a été créé avec succès. Vous allez être redirigé vers la page de connexion dans quelques secondes.
                     </CardDescription>
-                    <Button onClick={() => navigate('/login')} className="mt-4">Aller à la Connexion</Button>
+                    <Button onClick={() => navigate('/login')} className="mt-4">
+                        Aller à la Connexion Maintenant
+                    </Button>
                 </Card>
             </div>
         );
     }
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4">
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-2xl font-bold text-center">Créer un Compte</CardTitle>
@@ -57,7 +71,7 @@ const RegisterPage = () => {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                        {apiError && <p className="text-red-500 text-sm text-center">{apiError}</p>}
+                        {/* {apiError && <p className="text-red-500 text-sm text-center">{apiError}</p>} Removed */}
 
                         <div className="space-y-2">
                             <Label htmlFor="username">Nom d'utilisateur</Label>

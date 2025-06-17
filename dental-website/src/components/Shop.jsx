@@ -25,9 +25,12 @@ import { Skeleton } from "@/components/ui/skeleton"; // For loading skeleton
 // Helper for price formatting
 const formatPrice = (price) => {
     if (price === null || price === undefined) return '';
-    // Formats to "1 599 MAD"
     return price.toLocaleString('fr-FR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' MAD';
 };
+
+// Get the base URL for images, ensuring it doesn't end with /api
+const VITE_IMAGE_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace('/api', '');
+
 
 const Shop = () => {
   const [viewMode, setViewMode] = useState('grid');
@@ -88,14 +91,19 @@ const Shop = () => {
       params.search = searchTerm;
     }
 
+    const constructedUrl = axios.defaults.baseURL + '/products'; // Base URL is already set globally
+    console.log('Fetching products from:', constructedUrl, 'with params:', params);
+
     try {
       const response = await axios.get('/products', { params });
-      setProducts(response.data.products || []); // Ensure products is always an array
+      console.log('API Response:', response);
+      setProducts(response.data.products || []);
       setTotalPages(response.data.pages || 0);
+      console.log('Products data set:', response.data.products);
     } catch (err) {
-      console.error("Failed to fetch products:", err);
-      setErrorProducts('Impossible de charger les produits.');
-      setProducts([]); // Ensure products is an array on error
+      console.error("Error fetching products:", err.response || err.message || err);
+      setErrorProducts(err.response?.data?.error || 'Impossible de charger les produits. Veuillez réessayer.');
+      setProducts([]);
     } finally {
       setLoadingProducts(false);
     }
@@ -117,15 +125,24 @@ const Shop = () => {
     addItem(cartProduct, 1);
   };
 
-  const ProductCardComponent = ({ product }) => (
+  const ProductCardComponent = ({ product }) => {
+    // Construct full image URL. product.image_url might be relative like /static/uploads/...
+    // VITE_IMAGE_BASE_URL should be like http://localhost:5000
+    const imageUrl = product.image_url
+      ? product.image_url.startsWith('http')
+        ? product.image_url // Already a full URL
+        : `${VITE_IMAGE_BASE_URL}${product.image_url}` // Append base URL if relative path
+      : '/api/placeholder/300/300'; // Fallback placeholder
+
+    return (
     <Card className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
       <CardHeader className="p-0">
         <Link to={`/produit/${product.id}`} className="block aspect-square w-full overflow-hidden">
           <img
-            src={product.image_url || '/api/placeholder/300/300'}
+            src={imageUrl}
             alt={product.name}
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-            onError={(e) => e.target.src = '/api/placeholder/300/300'} // Fallback image
+            onError={(e) => { e.target.onerror = null; e.target.src = '/api/placeholder/300/300'; }} // More robust fallback
           />
         </Link>
         {product.badge && (
@@ -327,9 +344,10 @@ const Shop = () => {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           >
             <Search className="w-16 h-16 text-gray-400 mx-auto mb-6" />
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">Aucun produit trouvé</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">Aucun produit trouvé pour le moment.</h3>
             <p className="text-gray-600 mb-6">
-              Essayez d'ajuster vos filtres ou termes de recherche.
+              Notre boutique est peut-être vide ou les filtres actuels ne correspondent à aucun article.
+              Essayez de réinitialiser les filtres ou revenez bientôt !
             </p>
             <Button
               onClick={() => {
@@ -337,6 +355,7 @@ const Shop = () => {
                 setSelectedCategory('all');
                 setSortBy('name_asc');
                 setCurrentPage(1);
+                // fetchProducts(); // fetchProducts is called by useEffect when these states change
               }}
             >
               Réinitialiser les filtres
