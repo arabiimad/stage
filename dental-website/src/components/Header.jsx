@@ -3,9 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Menu, X, ShoppingBag, UserCircle, LogOut, LogIn, UserPlus, ShieldCheck } from 'lucide-react'; // Added ShieldCheck for Admin
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext'; // Import useAuth
-import { SkipLink } from '../utils/accessibility'; // ScreenReaderOnly removed as not used
-import { Button } from "@/components/ui/button"; // For styled auth buttons
+import { useAuth } from '../context/AuthContext';
+import { SkipLink, ScreenReaderOnly } from '../utils/accessibility';
+
 
 const Header = ({ isScrolled, onCartClick }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -13,12 +13,7 @@ const Header = ({ isScrolled, onCartClick }) => {
   const navigate = useNavigate();
   const { getTotalItems } = useCart();
   const totalItems = getTotalItems();
-  const { isAuthenticated, user, logout, loading } = useAuth(); // Get auth state and functions
-
-  // Determine if we are on a page where shop/auth elements should be visible
-  const showShopAndAuthElements = location.pathname.startsWith('/boutique') ||
-                                location.pathname.startsWith('/mon-compte') ||
-                                location.pathname.startsWith('/product'); // Product detail pages are part of boutique experience
+  const { user, logout } = useAuth();
 
 
   const navItems = [
@@ -123,14 +118,36 @@ const Header = ({ isScrolled, onCartClick }) => {
                 Boutique
               </Link>
 
-              {showShopAndAuthElements && (
+              {user ? (
                 <>
-                  {/* Cart Button */}
-                  <button
-                    onClick={onCartClick}
-                    onKeyDown={(e) => handleKeyDown(e, onCartClick)}
-                    className={`relative p-2 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${commonLinkClasses}`}
-                    aria-label={`Panier d'achat, ${totalItems} article${totalItems !== 1 ? 's' : ''}`}
+                  <Link to="/mon-compte" className="text-sm text-gray-600 hover:text-blue-600">
+                    {user.username}
+                  </Link>
+                  <button onClick={logout} className="text-sm text-gray-600 ml-2 hover:text-red-600">Déconnexion</button>
+                </>
+              ) : (
+                <Link to="/login" className="text-sm text-gray-600 hover:text-blue-600">Se connecter</Link>
+              )}
+
+              {/* Cart Button */}
+              <button
+                onClick={onCartClick}
+                onKeyDown={(e) => handleKeyDown(e, onCartClick)}
+                className={`relative p-2 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  isScrolled
+                    ? 'text-gray-600 hover:text-blue-600'
+                    : 'text-white/90 hover:text-white'
+                }`}
+                aria-label={`Panier d'achat, ${totalItems} article${totalItems !== 1 ? 's' : ''}`}
+                aria-describedby="cart-count"
+              >
+                <ShoppingBag className="w-6 h-6" aria-hidden="true" />
+                {totalItems > 0 && (
+                  <span
+                    id="cart-count"
+                    className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                    aria-label={`${totalItems} article${totalItems !== 1 ? 's' : ''} dans le panier`}
+
                   >
                     <ShoppingBag className="w-6 h-6" />
                     {totalItems > 0 && (
@@ -214,53 +231,26 @@ const Header = ({ isScrolled, onCartClick }) => {
                     <ShoppingBag className="w-5 h-5 inline mr-2" /> Boutique
                   </Link>
                 </li>
-                {showShopAndAuthElements && (
-                  <>
-                    <li role="none">
-                      <button onClick={onCartClick} className="flex items-center w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
-                        <ShoppingBag className="w-5 h-5 mr-2" /> Panier ({totalItems})
-                      </button>
-                    </li>
-                    <hr className="my-2"/>
-                    {/* Auth Links Mobile */}
-                    {!loading && (
-                        isAuthenticated ? (
-                        <>
-                            {user?.role === 'admin' && (
-                               <li role="none">
-                                 <Link to="/admin/dashboard" className="flex items-center w-full text-left px-4 py-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg" role="menuitem">
-                                   <ShieldCheck className="w-5 h-5 mr-2" /> Panel Admin
-                                 </Link>
-                               </li>
-                            )}
-                            <li role="none">
-                            <Link to="/mon-compte" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
-                                <UserCircle className="w-5 h-5 inline mr-2" /> {user?.username || 'Mon Compte'}
-                            </Link>
-                            </li>
-                            <li role="none">
-                            <button onClick={handleLogout} className="flex items-center w-full text-left px-4 py-3 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg" role="menuitem">
-                                <LogOut className="w-5 h-5 mr-2" /> Déconnexion
-                            </button>
-                            </li>
-                        </>
-                        ) : (
-                        <>
-                            <li role="none">
-                            <Link to="/login" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
-                                <LogIn className="w-5 h-5 inline mr-2" /> Connexion
-                            </Link>
-                            </li>
-                            <li role="none">
-                            <Link to="/register" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
-                                <UserPlus className="w-5 h-5 inline mr-2" /> Inscription
-                            </Link>
-                            </li>
-                        </>
-                        )
-                    )}
-                  </>
-                )}
+                <li role="none">
+                  <button
+                    onClick={onCartClick}
+                    onKeyDown={(e) => handleKeyDown(e, onCartClick)}
+                    className="flex items-center w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    role="menuitem"
+                    aria-label={`Panier d'achat, ${totalItems} article${totalItems !== 1 ? 's' : ''}`}
+                  >
+                    <ShoppingBag className="w-5 h-5 mr-2" aria-hidden="true" />
+                    Panier ({totalItems})
+                  </button>
+                </li>
+                <li role="none">
+                  {user ? (
+                    <button onClick={logout} className="block w-full text-left px-4 py-3 text-gray-600 hover:text-red-600 hover:bg-blue-50 rounded-lg">Se déconnecter</button>
+                  ) : (
+                    <Link to="/login" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg">Se connecter</Link>
+                  )}
+                </li>
+
               </ul>
             </motion.div>
           )}

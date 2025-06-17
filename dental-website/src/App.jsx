@@ -15,6 +15,10 @@ import Contact from './components/Contact';
 import Footer from './components/Footer';
 import Shop from './components/Shop';
 import ProductDetail from './components/ProductDetail';
+import Login from './components/Login';
+import Register from './components/Register';
+import Account from './components/Account';
+import Admin from './components/Admin';
 import CartSidebar from './components/CartSidebar';
 
 // Auth Page Components
@@ -51,67 +55,37 @@ function App() {
     <AuthProvider>
       <CartProvider>
         <Router>
-          <div className={`App ${isAdminRoute ? 'admin-app-layout' : ''}`}>
-            {/* Conditional rendering of Header and Footer for admin routes */}
-            {!isAdminRoute && (
-              <Header
-                isScrolled={isScrolled}
-                onCartClick={() => setIsCartOpen(true)}
-              />
-            )}
+        <div className="App">
+          <Header 
+            isScrolled={isScrolled} 
+            onCartClick={() => setIsCartOpen(true)}
+          />
+          
+          <Routes>
+            <Route path="/" element={
+              <main>
+                <Hero />
+                <About />
+                <Achievements />
+                <Contact />
+              </main>
+            } />
+            <Route path="/boutique" element={<Shop />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/mon-compte" element={<Account />} />
+            <Route path="/admin" element={<Admin />} />
+          </Routes>
+          
+          <Footer />
+          
+          <CartSidebar 
+            isOpen={isCartOpen} 
+            onClose={() => setIsCartOpen(false)} 
+          />
+        </div>
 
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={
-                <main id="main-content"> {/* Added main-content id for SkipLink */}
-                  <Hero />
-                  <About />
-                  <Achievements />
-                  <Contact />
-                </main>
-              } />
-              <Route path="/boutique" element={<Shop />} />
-              <Route path="/produit/:id" element={<ProductDetail />} />
-
-              {/* Auth Routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route
-                path="/mon-compte"
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* Admin Routes */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute role="admin"> {/* Protects all /admin/* routes */}
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<Navigate to="dashboard" replace />} /> {/* Default to dashboard */}
-                <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="products" element={<AdminProductsPage />} />
-                <Route path="orders" element={<AdminOrdersPage />} />
-                <Route path="articles" element={<AdminArticlesPage />} />
-              </Route>
-
-            </Routes>
-
-            {!isAdminRoute && <Footer />}
-
-            {!isAdminRoute && (
-              <CartSidebar
-                isOpen={isCartOpen}
-                onClose={() => setIsCartOpen(false)}
-              />
-            )}
-          </div>
         </Router>
       </CartProvider>
     </AuthProvider>
