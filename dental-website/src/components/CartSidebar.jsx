@@ -15,6 +15,18 @@ const formatPrice = (price) => {
     return price.toLocaleString('fr-FR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' MAD';
 };
 
+// Helper function to build the WhatsApp message
+const buildWhatsAppMessage = (cartItems, customerName, totalPrice) => {
+  let messageParts = ["*Nouvelle commande DentalTech Pro:*\n\n"]; // Using Markdown for bold
+  messageParts.push(`*Nom du client:* ${customerName}\n\n`);
+  messageParts.push("*Produits commandés:*\n");
+  cartItems.forEach(item => {
+    messageParts.push(`- ${item.name} (Quantité: ${item.quantity}) - ${formatPrice(item.price * item.quantity)}\n`);
+  });
+  messageParts.push(`\n*Total de la commande:* ${formatPrice(totalPrice)}`);
+  return messageParts.join('');
+};
+
 const CartSidebar = ({ isOpen, onClose }) => {
   const { items, updateQuantity, removeItem, getTotalPrice, clearCart } = useCart();
   const { user, isAuthenticated } = useAuth(); // Get user details
@@ -56,18 +68,12 @@ const CartSidebar = ({ isOpen, onClose }) => {
     }
 
     setIsSubmitting(true);
-    setCheckoutError('');
+    setCheckoutError(''); // Clear previous errors
 
     const finalCustomerName = isAuthenticated && user?.username ? user.username : customerName.trim();
 
-    let messageParts = [`Nouvelle commande DentalTech Pro:\n`];
-    messageParts.push(`Nom du client: ${finalCustomerName}\n`);
-    messageParts.push("Produits:\n");
-    items.forEach(item => {
-      messageParts.push(`- ${item.name} (Quantité: ${item.quantity}, Prix: ${formatPrice(item.price * item.quantity)})\n`);
-    });
-    messageParts.push(`\nTotal: ${formatPrice(getTotalPrice())}`);
-    const generatedWhatsAppMessageString = messageParts.join('');
+    // Use the helper function to build the message
+    const generatedWhatsAppMessageString = buildWhatsAppMessage(items, finalCustomerName, getTotalPrice());
 
     const orderPayload = {
       cart_items: items.map(item => ({

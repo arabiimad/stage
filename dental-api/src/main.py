@@ -27,9 +27,11 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 604800
 
 
-# Enable CORS for all routes
-CORS(app, origins=['*'])
-jwt = JWTManager(app)
+# Enable CORS for specific origins
+# For development, this allows the Vite dev server (default port 5173)
+# In production, this should be configured to the actual frontend domain.
+CORS(app, origins=['http://localhost:5173'], supports_credentials=True)
+
 
 # Initialize JWTManager
 jwt = JWTManager(app)
