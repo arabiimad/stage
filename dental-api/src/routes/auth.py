@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app # Added current_app
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
 from src.models import db # Assuming db is in src.models.__init__
 from src.models.user import User
@@ -14,12 +14,13 @@ def register():
     role = data.get('role', 'client') # Default role to 'client'
 
     if not username or not email or not password:
-        return jsonify({'message': 'Missing username, email, or password'}), 400
+        return jsonify({'msg': 'Missing username, email, or password'}), 400 # Changed 'message' to 'msg' for consistency with example
 
-    if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
-        return jsonify({'message': 'User already exists'}), 409
+    # Using a single query with OR condition is slightly more efficient
+    if User.query.filter((User.email == email) | (User.username == username)).first():
+        return jsonify({'msg': 'User with this email or username already exists'}), 409 # More specific message
 
-    new_user = User(username=username, email=email, role=role)
+    new_user = User(username=username, email=email, role=role) # Role defaults to 'client' in model if not provided
     new_user.set_password(password) # Hashing is done in this method
 
     try:
@@ -27,14 +28,15 @@ def register():
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        return jsonify({'message': 'Failed to register user', 'error': str(e)}), 500
+        current_app.logger.error(f"Error during registration for email {email}: {str(e)}") # Added logging
+        return jsonify({'msg': 'Registration failed due to an internal error'}), 500 # Changed 'message' to 'msg'
 
     # Include role in JWT claims
     access_token = create_access_token(identity=new_user.id, additional_claims={'role': new_user.role})
-    refresh_token = create_refresh_token(identity=new_user.id, additional_claims={'role': new_user.role})
+    refresh_token = create_refresh_token(identity=new_user.id, additional_claims={'role': new_user.role}) # Keep claims consistent
 
     return jsonify({
-        'message': 'User registered successfully',
+        'msg': 'User registered successfully', # Changed 'message' to 'msg'
         'access_token': access_token,
         'refresh_token': refresh_token,
         'user': new_user.to_dict() # Return user details (excluding password hash)
