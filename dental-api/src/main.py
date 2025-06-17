@@ -5,21 +5,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
-from src.models.product import db
+from flask_jwt_extended import JWTManager
+from src.database import db
 from src.routes.products import products_bp
 from src.routes.cart import cart_bp
 from src.routes.orders import orders_bp
+from src.routes.auth import auth_bp
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
+app.config['JWT_SECRET_KEY'] = 'super-secret-jwt-key'
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 604800
 
 # Enable CORS for all routes
 CORS(app, origins=['*'])
+jwt = JWTManager(app)
 
 # Register API blueprints
 app.register_blueprint(products_bp, url_prefix='/api')
 app.register_blueprint(cart_bp, url_prefix='/api')
 app.register_blueprint(orders_bp, url_prefix='/api')
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"

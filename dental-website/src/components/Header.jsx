@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Menu, X, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { SkipLink, ScreenReaderOnly } from '../utils/accessibility';
 
 const Header = ({ isScrolled, onCartClick }) => {
@@ -10,6 +11,7 @@ const Header = ({ isScrolled, onCartClick }) => {
   const location = useLocation();
   const { getTotalItems } = useCart();
   const totalItems = getTotalItems();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { name: 'Accueil', href: '/', section: 'hero' },
@@ -105,6 +107,17 @@ const Header = ({ isScrolled, onCartClick }) => {
                 Boutique
               </Link>
 
+              {user ? (
+                <>
+                  <Link to="/mon-compte" className="text-sm text-gray-600 hover:text-blue-600">
+                    {user.username}
+                  </Link>
+                  <button onClick={logout} className="text-sm text-gray-600 ml-2 hover:text-red-600">Déconnexion</button>
+                </>
+              ) : (
+                <Link to="/login" className="text-sm text-gray-600 hover:text-blue-600">Se connecter</Link>
+              )}
+
               {/* Cart Button */}
               <button
                 onClick={onCartClick}
@@ -197,6 +210,13 @@ const Header = ({ isScrolled, onCartClick }) => {
                     <ShoppingBag className="w-5 h-5 mr-2" aria-hidden="true" />
                     Panier ({totalItems})
                   </button>
+                </li>
+                <li role="none">
+                  {user ? (
+                    <button onClick={logout} className="block w-full text-left px-4 py-3 text-gray-600 hover:text-red-600 hover:bg-blue-50 rounded-lg">Se déconnecter</button>
+                  ) : (
+                    <Link to="/login" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg">Se connecter</Link>
+                  )}
                 </li>
               </ul>
             </motion.div>

@@ -9,6 +9,50 @@ orders_bp = Blueprint('orders', __name__)
 # In production, you would use a proper database table
 orders_storage = {}
 
+@orders_bp.route('/checkout/whatsapp', methods=['POST'])
+def checkout_whatsapp():
+    try:
+        data = request.get_json()
+        if not data or 'customer' not in data:
+            return jsonify({'error': 'customer info required'}), 400
+
+        cart_items = session.get('cart_items', [])
+        if not cart_items:
+            return jsonify({'error': 'Cart is empty'}), 400
+
+        order_items = []
+        total = 0
+        for item in cart_items:
+            product = Product.query.get(item['product_id'])
+            if not product:
+                return jsonify({'error': 'Product not found'}), 404
+            subtotal = product.price * item['quantity']
+            order_items.append({'product_id': product.id, 'name': product.name, 'qty': item['quantity'], 'subtotal': subtotal})
+            total += subtotal
+
+        order_id = str(uuid.uuid4())
+        order = {
+            'id': order_id,
+            'items': order_items,
+            'total_amount': total,
+            'status': 'pending',
+            'customer': data['customer'],
+            'created_at': datetime.utcnow().isoformat()
+        }
+        orders_storage[order_id] = order
+        session['cart_items'] = []
+
+        # Build WhatsApp message
+        message_lines = [f"{i['name']} x{i['qty']} = {i['subtotal']} MAD" for i in order_items]
+        message_lines.append(f"Total: {total} MAD")
+        if 'name' in data['customer']:
+            message_lines.append(f"Client: {data['customer']['name']}")
+        msg = '\n'.join(message_lines)
+        return jsonify({'order_id': order_id, 'message': msg}), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @orders_bp.route('/orders', methods=['POST'])
 def create_order():
     """Create a new order from cart contents"""
