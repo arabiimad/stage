@@ -24,6 +24,7 @@ const CartSidebar = ({ isOpen, onClose }) => {
   const [checkoutError, setCheckoutError] = useState('');
 
   const VITE_WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER;
+  const isCartEmpty = items.length === 0;
 
   useEffect(() => {
     if (isAuthenticated && user?.username) {
@@ -34,11 +35,20 @@ const CartSidebar = ({ isOpen, onClose }) => {
   }, [isAuthenticated, user]);
 
   const handleWhatsAppCheckout = async () => {
-    if (!VITE_WHATSAPP_NUMBER) {
-        toast.error("Configuration erreur: Numéro WhatsApp non défini.");
-        setCheckoutError("Le service de commande WhatsApp est actuellement indisponible.");
+    const whatsappNumber = VITE_WHATSAPP_NUMBER; // Use a local const for checks
+    if (!whatsappNumber || !/^[+\d]+$/.test(whatsappNumber)) { // Improved check
+        toast.error("Le service WhatsApp n'est pas configuré correctement. Veuillez contacter le support.");
+        setCheckoutError("Configuration WhatsApp invalide ou numéro manquant."); // More specific error
+        setIsSubmitting(false); // Ensure button is re-enabled if it was disabled by isSubmitting
         return;
     }
+
+    // This check is also part of the button's disabled state, but good for explicit function guard
+    if (isCartEmpty) {
+        toast.error("Votre panier est vide.");
+        return;
+    }
+
     if (!customerName.trim() && !isAuthenticated) {
         toast.error("Veuillez entrer votre nom pour continuer.");
         setCheckoutError("Le nom du client est requis.");
@@ -198,7 +208,7 @@ const CartSidebar = ({ isOpen, onClose }) => {
 
                 <Button
                   onClick={handleWhatsAppCheckout}
-                  disabled={isSubmitting || (!customerName.trim() && !isAuthenticated)}
+                  disabled={isSubmitting || isCartEmpty || (!isAuthenticated && !customerName.trim())}
                   className="w-full text-lg py-6 bg-green-500 hover:bg-green-600 text-white flex items-center justify-center space-x-2.5"
                 >
                   <MessageSquare className="w-5 h-5" />

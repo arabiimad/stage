@@ -1,5 +1,5 @@
 from src.models import db # Import db from the __init__.py in the models directory
-import bcrypt
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(db.Model):
     __tablename__ = 'users' # Explicitly defining table name is good practice
@@ -7,7 +7,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False) # Increased length for hash
+    # Increased string length for Werkzeug password hashes (e.g., pbkdf2:sha256:260000$salt$hash)
+    password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(80), nullable=False, default='client') # e.g., client, admin
 
     # orders backref is added by Order model
@@ -16,19 +17,17 @@ class User(db.Model):
         # Ensure password is a string
         if not isinstance(password, str):
             raise TypeError("Password must be a string")
-        # Encode password to bytes, generate salt, hash, then decode hash back to string for DB storage
-        salt = bcrypt.gensalt()
-        self.password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+        # Werkzeug's generate_password_hash handles salting and returns a string
+        self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        # Ensure password_hash is not None and is a string (already stored as string)
-        if self.password_hash is None: # Should not happen if nullable=False
-            return False
-        if not isinstance(password, str): # Ensure input password is a string
+        # Ensure password_hash is not None (already checked by nullable=False on column)
+        # and input password is a string
+        if self.password_hash is None or not isinstance(password, str):
             return False
 
-        # Encode both password to check and stored hash to bytes for bcrypt.checkpw
-        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+        # Werkzeug's check_password_hash takes the stored hash and the password to check
+        return check_password_hash(self.password_hash, password)
 
     def __repr__(self):
         return f'<User {self.username}>'

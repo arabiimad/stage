@@ -12,53 +12,40 @@ const RegisterPage = () => {
     const { register: formRegister, handleSubmit, formState: { errors }, watch } = useForm();
     const { register: authRegister, loading } = useAuth();
     const navigate = useNavigate();
-    // const [apiError, setApiError] = useState(''); // Removed apiError state
-    const [registrationSuccess, setRegistrationSuccess] = useState(false);
+    // const [apiError, setApiError] = useState(''); // Not needed anymore
+    // const [registrationSuccess, setRegistrationSuccess] = useState(false); // Not needed if redirecting immediately
 
     // Watch password for confirmation
     const password = watch('password');
 
     const onSubmit = async (data) => {
-        // setApiError(''); // No longer needed
-        setRegistrationSuccess(false); // Reset success state on new submission
         try {
-            const response = await authRegister(data.username, data.email, data.password);
-            // Assuming backend returns a success message or user details
-            toast.success(response?.data?.msg || 'Inscription réussie! Vous pouvez maintenant vous connecter.');
-            setRegistrationSuccess(true);
+            const responseData = await authRegister(data.username, data.email, data.password); // authRegister now returns response.data
+            toast.success(responseData.msg || 'Inscription réussie! Vous êtes maintenant connecté.');
 
-            // Keep the redirect to login page after a delay
-            setTimeout(() => {
-                navigate('/login');
-            }, 3000);
+            const userRole = responseData.user?.role;
+
+            // Role-based redirection since AuthContext now auto-logs in after registration
+            if (userRole === 'admin') { // Unlikely for self-registration, but handle case
+                navigate('/admin/dashboard', { replace: true });
+            } else { // Default for 'client' role
+                navigate('/boutique', { replace: true }); // Redirect to shop page for clients
+            }
         } catch (error) {
             let friendlyErrorMessage = "L'inscription a échoué. Veuillez réessayer.";
-            // Backend error messages are usually in error.response.data.msg or error.response.data.message
-            if (error.response && error.response.data && (error.response.data.msg || error.response.data.message)) {
-              friendlyErrorMessage = error.response.data.msg || error.response.data.message;
+            // Backend error messages are now in error.response.data.error
+            if (error.response && error.response.data && error.response.data.error) {
+              friendlyErrorMessage = error.response.data.error;
             } else if (error.message && !error.response) { // Network errors or other issues
               friendlyErrorMessage = `Échec de l'inscription: ${error.message}`;
             }
             toast.error(friendlyErrorMessage);
-            // setApiError(friendlyErrorMessage); // No longer needed
         }
     };
 
-    if (registrationSuccess) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4">
-                <Card className="w-full max-w-md p-6 text-center">
-                    <CardTitle className="text-2xl font-bold text-green-600">Inscription Réussie!</CardTitle>
-                    <CardDescription className="mt-2">
-                        Votre compte a été créé avec succès. Vous allez être redirigé vers la page de connexion dans quelques secondes.
-                    </CardDescription>
-                    <Button onClick={() => navigate('/login')} className="mt-4">
-                        Aller à la Connexion Maintenant
-                    </Button>
-                </Card>
-            </div>
-        );
-    }
+    // The registrationSuccess state and separate success view are removed
+    // because the user is now auto-logged in and redirected.
+    // If a separate success message page was desired before redirect, that state could be kept.
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100 py-12 px-4">

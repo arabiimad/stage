@@ -14,11 +14,11 @@ def register():
     role = data.get('role', 'client') # Default role to 'client'
 
     if not username or not email or not password:
-        return jsonify({'msg': 'Missing username, email, or password'}), 400 # Changed 'message' to 'msg' for consistency with example
+        return jsonify({'error': 'Missing username, email, or password'}), 400 # Use 'error' key
 
     # Using a single query with OR condition is slightly more efficient
     if User.query.filter((User.email == email) | (User.username == username)).first():
-        return jsonify({'msg': 'User with this email or username already exists'}), 409 # More specific message
+        return jsonify({'error': 'User with this email or username already exists'}), 409 # Use 'error' key
 
     new_user = User(username=username, email=email, role=role) # Role defaults to 'client' in model if not provided
     new_user.set_password(password) # Hashing is done in this method
@@ -29,7 +29,7 @@ def register():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error during registration for email {email}: {str(e)}") # Added logging
-        return jsonify({'msg': 'Registration failed due to an internal error'}), 500 # Changed 'message' to 'msg'
+        return jsonify({'error': 'Registration failed due to an internal error'}), 500 # Use 'error' key
 
     # Include role in JWT claims
     access_token = create_access_token(identity=new_user.id, additional_claims={'role': new_user.role})
@@ -49,7 +49,7 @@ def login():
     password = data.get('password')
 
     if not email or not password:
-        return jsonify({'message': 'Missing email or password'}), 400
+        return jsonify({'error': 'Missing email or password'}), 400 # Use 'error' key
 
     user = User.query.filter_by(email=email).first()
 
@@ -58,13 +58,13 @@ def login():
         access_token = create_access_token(identity=user.id, additional_claims={'role': user.role})
         refresh_token = create_refresh_token(identity=user.id, additional_claims={'role': user.role})
         return jsonify({
-            'message': 'Login successful',
+            'msg': 'Login successful', # Use 'msg' key for success
             'access_token': access_token,
             'refresh_token': refresh_token,
             'user': user.to_dict()
         }), 200
     else:
-        return jsonify({'message': 'Invalid credentials'}), 401
+        return jsonify({'error': 'Invalid email or password'}), 401 # Use 'error' key, more generic message
 
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)

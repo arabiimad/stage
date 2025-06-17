@@ -1,7 +1,7 @@
-import React from 'react'; // Removed useState as apiError state is no longer needed
+import React from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'sonner'; // Import toast
+import { useNavigate, Link, useLocation } from 'react-router-dom'; // Added useLocation
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,24 +12,31 @@ const LoginPage = () => {
     const { register: formRegister, handleSubmit, formState: { errors } } = useForm();
     const { login, loading } = useAuth();
     const navigate = useNavigate();
-    // const [apiError, setApiError] = useState(''); // Removed apiError state
+    const location = useLocation(); // For redirecting to previous page
 
     const onSubmit = async (data) => {
-        // setApiError(''); // No longer needed
         try {
-            await login(data.email, data.password);
-            toast.success('Connexion réussie! Redirection...');
-            navigate('/mon-compte'); // Redirect to profile or dashboard
+            const responseData = await login(data.email, data.password); // login now returns response.data
+            toast.success(responseData.msg || 'Connexion réussie! Redirection...');
+
+            const userRole = responseData.user?.role;
+
+            if (userRole === 'admin') {
+                navigate('/admin/dashboard', { replace: true });
+            } else {
+                // For clients, redirect to intended page or /boutique as default
+                const from = location.state?.from?.pathname || '/boutique';
+                navigate(from, { replace: true });
+            }
         } catch (error) {
             let friendlyErrorMessage = 'La connexion a échoué. Veuillez vérifier vos identifiants et réessayer.';
-            // Backend error messages are usually in error.response.data.msg or error.response.data.message
-            if (error.response && error.response.data && (error.response.data.msg || error.response.data.message)) {
-              friendlyErrorMessage = error.response.data.msg || error.response.data.message;
-            } else if (error.message && !error.response) { // Network errors or other issues without a response body
+            // Backend error messages are now in error.response.data.error
+            if (error.response && error.response.data && error.response.data.error) {
+              friendlyErrorMessage = error.response.data.error;
+            } else if (error.message && !error.response) { // Network errors or other issues
               friendlyErrorMessage = `Échec de la connexion: ${error.message}`;
             }
             toast.error(friendlyErrorMessage);
-            // setApiError(friendlyErrorMessage); // No longer needed
         }
     };
 
