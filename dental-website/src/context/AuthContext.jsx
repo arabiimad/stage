@@ -1,12 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
-// Configure Axios base URL - This should be done once, typically when axios is imported or in an init file.
-// It's here for self-containment in this context file.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-axios.defaults.baseURL = API_BASE_URL;
-
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
     // Use 'authToken' as the key for localStorage as per subtask instructions
@@ -124,6 +118,31 @@ export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) { // Check if context is undefined, not null
         throw new Error('useAuth must be used within an AuthProvider');
+
     }
-    return context;
+    return false;
+  };
+
+  const register = async (username, email, password) => {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password }),
+    });
+    return res.ok;
+  };
+
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('token');
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
+
+export const useAuth = () => useContext(AuthContext);

@@ -5,18 +5,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory, jsonify # Added jsonify
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager # Import JWTManager
-from src.models import db # Corrected db import
+from flask_jwt_extended import JWTManager
+from src.database import db
 from src.routes.products import products_bp
 from src.routes.cart import cart_bp
 from src.routes.orders import orders_bp
-from src.routes.auth import auth_bp # Import auth_bp
-from src.routes.admin.products_admin import products_admin_bp # Import admin products blueprint
-from src.routes.admin.orders_admin import orders_admin_bp # Import admin orders blueprint
-from src.routes.admin.articles_admin import articles_admin_bp # Import admin articles blueprint
-from src.routes.admin.stock_alerts_sse import stock_alerts_sse_bp # Import SSE blueprint
-# Keep os import at the top if it was already there, otherwise ensure it is imported.
-# import os # Already imported at the top by default in this project
+from src.routes.auth import auth_bp
+
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 
@@ -27,12 +22,16 @@ app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
-app.config['JWT_SECRET_KEY'] = 'your-jwt-secret-key-please-change' # Configure JWT_SECRET_KEY
+app.config['JWT_SECRET_KEY'] = 'super-secret-jwt-key'
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 604800
+
 
 # Enable CORS for specific origins
 # For development, this allows the Vite dev server (default port 5173)
 # In production, this should be configured to the actual frontend domain.
 CORS(app, origins=['http://localhost:5173'], supports_credentials=True)
+
 
 # Initialize JWTManager
 jwt = JWTManager(app)
@@ -46,11 +45,8 @@ def allowed_file(filename):
 app.register_blueprint(products_bp, url_prefix='/api')
 app.register_blueprint(cart_bp, url_prefix='/api')
 app.register_blueprint(orders_bp, url_prefix='/api')
-app.register_blueprint(auth_bp, url_prefix='/api') # Register auth_bp
-app.register_blueprint(products_admin_bp, url_prefix='/api/admin') # Register admin products blueprint
-app.register_blueprint(orders_admin_bp, url_prefix='/api/admin') # Register admin orders blueprint
-app.register_blueprint(articles_admin_bp, url_prefix='/api/admin') # Register admin articles blueprint
-app.register_blueprint(stock_alerts_sse_bp, url_prefix='/api/admin') # Register SSE blueprint
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+
 
 # Database configuration
 # Use DATABASE_URL from environment if available (for PostgreSQL in Docker),

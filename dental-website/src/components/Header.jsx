@@ -3,9 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Menu, X, ShoppingBag, UserCircle, LogOut, LogIn, UserPlus, ShieldCheck } from 'lucide-react'; // Added ShieldCheck for Admin
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext'; // Import useAuth
-import { SkipLink } from '../utils/accessibility'; // ScreenReaderOnly removed as not used
-import { Button } from "@/components/ui/button"; // For styled auth buttons
+import { useAuth } from '../context/AuthContext';
+import { SkipLink, ScreenReaderOnly } from '../utils/accessibility';
+
 
 const Header = ({ isScrolled, onCartClick }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -25,6 +25,7 @@ const Header = ({ isScrolled, onCartClick }) => {
   const showAuthLinks = location.pathname.startsWith('/boutique') ||
                         location.pathname.startsWith('/mon-compte') ||
                         location.pathname.startsWith('/product');
+
 
 
   const navItems = [
@@ -129,7 +130,8 @@ const Header = ({ isScrolled, onCartClick }) => {
                 Boutique
               </Link>
 
-              {/* Cart Button - visibility controlled by showCartIcon */}
+
+{/* Cart Button - visibility controlled by showCartIcon */}
               {showCartIcon && (
                 <button
                   onClick={onCartClick}
@@ -144,6 +146,7 @@ const Header = ({ isScrolled, onCartClick }) => {
                     >
                       {totalItems}
                     </span>
+
                   )}
                 </button>
               )}
@@ -267,6 +270,7 @@ const Header = ({ isScrolled, onCartClick }) => {
                     )}
                   </>
                 )}
+
               </ul>
             </motion.div>
           )}
