@@ -18,6 +18,7 @@ import { useCart } from '../context/CartContext';
 import axios from 'axios'; // Assuming axios is configured in AuthContext or globally
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label"; // Added missing Label import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Using ShadCN select
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"; // For product card styling
 import { Skeleton } from "@/components/ui/skeleton"; // For loading skeleton
@@ -200,6 +201,7 @@ const Shop = () => {
       </CardFooter>
     </Card>
   );
+  }; // <<<< ADDED MISSING CLOSING BRACE HERE
 
   const SkeletonCard = () => (
     <Card className="flex flex-col h-full overflow-hidden">
