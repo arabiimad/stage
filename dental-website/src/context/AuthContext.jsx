@@ -1,77 +1,73 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios'; // Assume axios is installed
+import axios from 'axios';
 
-// Configure Axios base URL
+// Configure Axios base URL - This should be done once, typically when axios is imported or in an init file.
+// It's here for self-containment in this context file.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 axios.defaults.baseURL = API_BASE_URL;
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [token, setToken] = useState(localStorage.getItem('token'));
+    // Use 'authToken' as the key for localStorage as per subtask instructions
+    const [token, setToken] = useState(localStorage.getItem('authToken'));
     const [user, setUser] = useState(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // True initially to indicate auth status is being checked
 
-    const loadUser = async (currentToken) => {
-        if (!currentToken) {
-            setLoading(false);
-            setIsAuthenticated(false);
-            setUser(null);
-            return;
-        }
-
-        axios.defaults.headers.common['Authorization'] = `Bearer ${currentToken}`;
-        try {
-            const response = await axios.get('/auth/me');
-            setUser(response.data);
-            setIsAuthenticated(true);
-        } catch (error) {
-            console.error('Failed to load user:', error);
-            localStorage.removeItem('token');
-            setToken(null);
-            setUser(null);
-            setIsAuthenticated(false);
-            delete axios.defaults.headers.common['Authorization'];
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // This useEffect handles initial auth status check based on token in localStorage
     useEffect(() => {
-        const storedToken = localStorage.getItem('token');
-        if (storedToken) {
-            setToken(storedToken);
-            loadUser(storedToken);
+        const tokenFromStorage = localStorage.getItem('authToken');
+        if (tokenFromStorage) {
+            // console.log("AuthContext: Found token in storage, attempting to load user.");
+            axios.defaults.headers.common['Authorization'] = `Bearer ${tokenFromStorage}`;
+            setToken(tokenFromStorage); // Set token in state
+
+            axios.get('/auth/me')
+                .then(response => {
+                    setUser(response.data); // Assuming response.data is the user object
+                    setIsAuthenticated(true);
+                    // console.log("AuthContext: User loaded successfully.", response.data);
+                })
+                .catch(error => {
+                    console.error('AuthContext: Failed to load user with stored token.', error.response || error.message);
+                    // Token is invalid or expired, clear it
+                    localStorage.removeItem('authToken');
+                    delete axios.defaults.headers.common['Authorization'];
+                    setToken(null);
+                    setUser(null);
+                    setIsAuthenticated(false);
+                })
+                .finally(() => {
+                    setLoading(false);
+                });
         } else {
-            setLoading(false);
+            // console.log("AuthContext: No token in storage.");
+            setLoading(false); // No token, not loading anymore
         }
-    }, []);
+    }, []); // Empty dependency array means this runs once on mount
 
     const login = async (email, password) => {
-        setLoading(true);
+        setLoading(true); // Indicate loading state during login attempt
         try {
             const response = await axios.post('/auth/login', { email, password });
-            const { access_token, user_details } = response.data; // Assuming backend sends user_details or just token
+            const { access_token, user: userData } = response.data; // Backend returns 'user' object directly
 
-            localStorage.setItem('token', access_token);
-            setToken(access_token);
+            localStorage.setItem('authToken', access_token);
             axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
 
-            // Option 1: Backend sends user details on login
-            if (user_details) {
-                setUser(user_details);
-            } else {
-            // Option 2: Fetch user details after login
-                await loadUser(access_token);
-            }
+            setToken(access_token);
+            setUser(userData); // Set user directly from login response
             setIsAuthenticated(true);
+            // console.log("AuthContext: Login successful.", userData);
             setLoading(false);
-            return response;
+            return response.data; // Return response.data which contains user, tokens, msg
         } catch (error) {
             setLoading(false);
-            console.error('Login failed:', error.response ? error.response.data : error.message);
-            throw error;
+            // console.error('AuthContext: Login failed:', error.response ? error.response.data : error.message);
+            // Clear any potentially stale auth headers if login fails
+            delete axios.defaults.headers.common['Authorization'];
+            throw error; // Re-throw to be caught by calling component
         }
     };
 
@@ -79,29 +75,45 @@ export const AuthProvider = ({ children }) => {
         setLoading(true);
         try {
             const response = await axios.post('/auth/register', { username, email, password });
-            // Optionally, log the user in directly or handle as per app flow
-            // For now, just return the response, user should go to login page.
+            const { access_token, user: userData } = response.data; // Backend register returns token and user
+
+            // Automatically log in the user after successful registration
+            if (access_token && userData) {
+                localStorage.setItem('authToken', access_token);
+                axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+                setToken(access_token);
+                setUser(userData);
+                setIsAuthenticated(true);
+                // console.log("AuthContext: Registration successful, user auto-logged in.", userData);
+            }
+            // If backend doesn't return token/user on register, the above block won't run,
+            // and user would need to login manually. Current backend setup does return them.
             setLoading(false);
-            return response;
+            return response.data; // Return response.data
         } catch (error) {
             setLoading(false);
-            console.error('Registration failed:', error.response ? error.response.data : error.message);
-            throw error;
+            // console.error('AuthContext: Registration failed:', error.response ? error.response.data : error.message);
+            throw error; // Re-throw
         }
     };
 
     const logout = () => {
-        localStorage.removeItem('token');
+        // console.log("AuthContext: Logging out.");
+        localStorage.removeItem('authToken');
+        delete axios.defaults.headers.common['Authorization'];
         setToken(null);
         setUser(null);
         setIsAuthenticated(false);
-        delete axios.defaults.headers.common['Authorization'];
-        // Optionally, redirect or call a backend logout endpoint
-        // window.location.href = '/login'; // Or use useNavigate if within Router context
+        // No need to call backend logout unless it invalidates tokens server-side,
+        // which is good practice for refresh tokens but not always done for access tokens.
     };
 
+    // The loadUser function is effectively replaced by the useEffect hook for initial load.
+    // If manual refresh of user data is needed elsewhere, a similar function could be exposed.
+    // For this refactor, we assume initial load and login/register cover user data setting.
+
     return (
-        <AuthContext.Provider value={{ token, user, isAuthenticated, loading, login, register, logout, loadUser }}>
+        <AuthContext.Provider value={{ token, user, isAuthenticated, loading, login, register, logout }}>
             {children}
         </AuthContext.Provider>
     );
@@ -109,7 +121,7 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (context === undefined) {
+    if (context === undefined) { // Check if context is undefined, not null
         throw new Error('useAuth must be used within an AuthProvider');
     }
     return context;

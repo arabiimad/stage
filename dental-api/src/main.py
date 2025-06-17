@@ -3,7 +3,7 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify # Added jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager # Import JWTManager
 from src.models import db # Corrected db import
@@ -68,6 +68,25 @@ with app.app_context():
     # if Product.query.count() == 0:
     #     from src.utils.seed_data import seed_products
     #     seed_products()
+
+# Global Error Handlers
+@app.errorhandler(405)
+def method_not_allowed(e):
+    # current_app.logger.warning(f"Method Not Allowed (405): {request.method} {request.path} - {e}") # Optional: log request details
+    return jsonify(error="Method Not Allowed On This Endpoint"), 405
+
+@app.errorhandler(404) # Optional: Add a JSON 404 handler too for API consistency
+def not_found_error(e):
+    # current_app.logger.warning(f"Not Found (404): {request.path} - {e}")
+    # Check if the request path starts with /api to only affect API calls
+    # from flask import request # Import request if using it here
+    # if request.path.startswith('/api/'):
+    #    return jsonify(error="Resource not found"), 404
+    # else:
+    #    # For non-API routes, you might want Flask's default HTML 404 or your frontend's 404
+    #    # This part needs careful consideration based on how frontend handles 404s for non-API paths
+    return jsonify(error="The requested URL was not found on the server."), 404
+
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

@@ -37,25 +37,27 @@ def seed_all():
         # 1. Seed Admin User
         print("Seeding admin user...")
         admin_email = 'admin@dentaltech.pro'
-        admin_password = 'Admin123!' # New password as per instructions
+        admin_username = 'admin' # Ensure username is consistent
+        admin_password = 'admin123' # Updated password to all lowercase as per current subtask
+        admin_role = 'admin'
 
         admin_user = User.query.filter_by(email=admin_email).first()
         if not admin_user:
             admin_user = User(
-                username='admin',
+                username=admin_username,
                 email=admin_email,
-                role='admin'
+                role=admin_role
             )
-            admin_user.set_password(admin_password)
+            admin_user.set_password(admin_password) # Uses werkzeug via set_password
             db.session.add(admin_user)
-            print(f"Admin user '{admin_user.username}' created with new password.")
+            print(f"Admin user '{admin_user.email}' created with new password.")
         else:
-            # Optionally update existing admin's password and role, or just ensure they exist
-            admin_user.set_password(admin_password) # Ensure password is set to the defined one
-            admin_user.role = 'admin' # Ensure role is admin
-            print(f"Admin user '{admin_user.username}' already exists. Password updated and role ensured.")
+            admin_user.username = admin_username # Ensure username is also consistent
+            admin_user.set_password(admin_password) # Update password
+            admin_user.role = admin_role # Ensure role is admin
+            print(f"Admin user '{admin_user.email}' updated with new password and role '{admin_user.role}'.")
 
-        print(f"Admin user '{admin_user.username}' (role: {admin_user.role}) configured.")
+        # print(f"Admin user '{admin_user.username}' (role: {admin_user.role}) configured.") # Redundant with above
 
         # 2. Seed Products
         print("Seeding products...")
