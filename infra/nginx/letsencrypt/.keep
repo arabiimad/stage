@@ -1,0 +1,2 @@
+# This file is to ensure the directory gets created by the tool.
+# Certbot will populate this directory with SSL certificates.

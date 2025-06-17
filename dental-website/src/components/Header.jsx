@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Menu, X, ShoppingBag } from 'lucide-react';
+import { Menu, X, ShoppingBag, UserCircle, LogOut, LogIn, UserPlus, ShieldCheck } from 'lucide-react'; // Added ShieldCheck for Admin
 import { useCart } from '../context/CartContext';
-import { SkipLink, ScreenReaderOnly } from '../utils/accessibility';
+import { useAuth } from '../context/AuthContext'; // Import useAuth
+import { SkipLink } from '../utils/accessibility'; // ScreenReaderOnly removed as not used
+import { Button } from "@/components/ui/button"; // For styled auth buttons
 
 const Header = ({ isScrolled, onCartClick }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { getTotalItems } = useCart();
   const totalItems = getTotalItems();
+  const { isAuthenticated, user, logout, loading } = useAuth(); // Get auth state and functions
 
   const navItems = [
     { name: 'Accueil', href: '/', section: 'hero' },
@@ -20,15 +24,22 @@ const Header = ({ isScrolled, onCartClick }) => {
 
   const scrollToSection = (sectionId) => {
     if (location.pathname !== '/') {
-      window.location.href = `/#${sectionId}`;
-      return;
-    }
-    
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
+      // If not on homepage, navigate to homepage then scroll.
+      // Consider if direct navigation to section is better.
+      navigate(`/#${sectionId}`);
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     }
     setIsMobileMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setIsMobileMenuOpen(false);
+    navigate('/'); // Redirect to home after logout
   };
 
   const handleKeyDown = (e, action) => {
@@ -37,6 +48,12 @@ const Header = ({ isScrolled, onCartClick }) => {
       action();
     }
   };
+
+  const commonLinkClasses = isScrolled
+    ? 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+    : 'text-white/90 hover:text-white hover:bg-white/10';
+  const commonButtonBaseClasses = "px-4 py-2 rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500";
+
 
   return (
     <>
@@ -75,18 +92,14 @@ const Header = ({ isScrolled, onCartClick }) => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              <ul className="flex items-center space-x-8" role="menubar">
+            <div className="hidden md:flex items-center space-x-6"> {/* Adjusted space for more items */}
+              <ul className="flex items-center space-x-6" role="menubar"> {/* Adjusted space */}
                 {navItems.map((item) => (
                   <li key={item.name} role="none">
                     <button
                       onClick={() => scrollToSection(item.section)}
                       onKeyDown={(e) => handleKeyDown(e, () => scrollToSection(item.section))}
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        isScrolled
-                          ? 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
-                          : 'text-white/90 hover:text-white hover:bg-white/10'
-                      }`}
+                      className={`${commonButtonBaseClasses} ${commonLinkClasses}`}
                       role="menuitem"
                     >
                       {item.name}
@@ -95,59 +108,71 @@ const Header = ({ isScrolled, onCartClick }) => {
                 ))}
               </ul>
 
-              {/* Boutique Link */}
               <Link
                 to="/boutique"
-                className="bg-turquoise-500 text-white px-6 py-2 rounded-lg hover:bg-turquoise-600 transition-all duration-200 font-semibold focus:outline-none focus:ring-2 focus:ring-turquoise-500 focus:ring-offset-2"
+                className={`flex items-center ${commonButtonBaseClasses} bg-turquoise-500 text-white hover:bg-turquoise-600 focus:ring-turquoise-500`}
                 aria-label="Accéder à la boutique en ligne"
               >
-                <ShoppingBag className="w-5 h-5 inline mr-2" aria-hidden="true" />
+                <ShoppingBag className="w-5 h-5 mr-2" aria-hidden="true" />
                 Boutique
               </Link>
 
               {/* Cart Button */}
-              <button
+               <button
                 onClick={onCartClick}
                 onKeyDown={(e) => handleKeyDown(e, onCartClick)}
-                className={`relative p-2 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  isScrolled
-                    ? 'text-gray-600 hover:text-blue-600'
-                    : 'text-white/90 hover:text-white'
-                }`}
+                className={`relative p-2 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${commonLinkClasses}`}
                 aria-label={`Panier d'achat, ${totalItems} article${totalItems !== 1 ? 's' : ''}`}
-                aria-describedby="cart-count"
               >
-                <ShoppingBag className="w-6 h-6" aria-hidden="true" />
+                <ShoppingBag className="w-6 h-6" />
                 {totalItems > 0 && (
                   <span
-                    id="cart-count"
                     className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
-                    aria-label={`${totalItems} article${totalItems !== 1 ? 's' : ''} dans le panier`}
                   >
                     {totalItems}
                   </span>
                 )}
               </button>
+
+              {/* Auth Links Desktop */}
+              {!loading && (
+                isAuthenticated ? (
+                  <>
+                    {user?.role === 'admin' && (
+                      <Link to="/admin/dashboard" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center text-red-500 hover:text-red-700`}>
+                        <ShieldCheck className="w-5 h-5 mr-1" /> Admin
+                      </Link>
+                    )}
+                    <Link to="/mon-compte" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
+                      <UserCircle className="w-5 h-5 mr-1" /> {user?.username || 'Mon Compte'}
+                    </Link>
+                    <Button onClick={handleLogout} variant="outline" size="sm" className={`${isScrolled ? 'text-gray-700 border-gray-300 hover:bg-gray-100' : 'text-white border-white/50 hover:bg-white/10'}`}>
+                      <LogOut className="w-4 h-4 mr-1" /> Déconnexion
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
+                       <LogIn className="w-5 h-5 mr-1" /> Connexion
+                    </Link>
+                    <Link to="/register" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
+                       <UserPlus className="w-5 h-5 mr-1" /> Inscription
+                    </Link>
+                  </>
+                )
+              )}
             </div>
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               onKeyDown={(e) => handleKeyDown(e, () => setIsMobileMenuOpen(!isMobileMenuOpen))}
-              className={`md:hidden p-2 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isScrolled
-                  ? 'text-gray-600 hover:text-blue-600'
-                  : 'text-white/90 hover:text-white'
-              }`}
+              className={`md:hidden p-2 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${commonLinkClasses}`}
               aria-label={isMobileMenuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-menu"
             >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" aria-hidden="true" />
-              ) : (
-                <Menu className="w-6 h-6" aria-hidden="true" />
-              )}
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
 
@@ -167,8 +192,7 @@ const Header = ({ isScrolled, onCartClick }) => {
                   <li key={item.name} role="none">
                     <button
                       onClick={() => scrollToSection(item.section)}
-                      onKeyDown={(e) => handleKeyDown(e, () => scrollToSection(item.section))}
-                      className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
                       role="menuitem"
                     >
                       {item.name}
@@ -176,28 +200,53 @@ const Header = ({ isScrolled, onCartClick }) => {
                   </li>
                 ))}
                 <li role="none">
-                  <Link
-                    to="/boutique"
-                    className="block w-full text-left px-4 py-3 bg-turquoise-500 text-white rounded-lg hover:bg-turquoise-600 transition-all duration-200 font-semibold focus:outline-none focus:ring-2 focus:ring-turquoise-500"
-                    role="menuitem"
-                    aria-label="Accéder à la boutique en ligne"
-                  >
-                    <ShoppingBag className="w-5 h-5 inline mr-2" aria-hidden="true" />
-                    Boutique
+                  <Link to="/boutique" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
+                    <ShoppingBag className="w-5 h-5 inline mr-2" /> Boutique
                   </Link>
                 </li>
                 <li role="none">
-                  <button
-                    onClick={onCartClick}
-                    onKeyDown={(e) => handleKeyDown(e, onCartClick)}
-                    className="flex items-center w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    role="menuitem"
-                    aria-label={`Panier d'achat, ${totalItems} article${totalItems !== 1 ? 's' : ''}`}
-                  >
-                    <ShoppingBag className="w-5 h-5 mr-2" aria-hidden="true" />
-                    Panier ({totalItems})
+                  <button onClick={onCartClick} className="flex items-center w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
+                    <ShoppingBag className="w-5 h-5 mr-2" /> Panier ({totalItems})
                   </button>
                 </li>
+                <hr className="my-2"/>
+                {/* Auth Links Mobile */}
+                {!loading && (
+                    isAuthenticated ? (
+                    <>
+                        {user?.role === 'admin' && (
+                           <li role="none">
+                             <Link to="/admin/dashboard" className="flex items-center w-full text-left px-4 py-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg" role="menuitem">
+                               <ShieldCheck className="w-5 h-5 mr-2" /> Panel Admin
+                             </Link>
+                           </li>
+                        )}
+                        <li role="none">
+                        <Link to="/mon-compte" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
+                            <UserCircle className="w-5 h-5 inline mr-2" /> {user?.username || 'Mon Compte'}
+                        </Link>
+                        </li>
+                        <li role="none">
+                        <button onClick={handleLogout} className="flex items-center w-full text-left px-4 py-3 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg" role="menuitem">
+                            <LogOut className="w-5 h-5 mr-2" /> Déconnexion
+                        </button>
+                        </li>
+                    </>
+                    ) : (
+                    <>
+                        <li role="none">
+                        <Link to="/login" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
+                            <LogIn className="w-5 h-5 inline mr-2" /> Connexion
+                        </Link>
+                        </li>
+                        <li role="none">
+                        <Link to="/register" className="block w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
+                            <UserPlus className="w-5 h-5 inline mr-2" /> Inscription
+                        </Link>
+                        </li>
+                    </>
+                    )
+                )}
               </ul>
             </motion.div>
           )}
@@ -208,4 +257,3 @@ const Header = ({ isScrolled, onCartClick }) => {
 };
 
 export default Header;
-

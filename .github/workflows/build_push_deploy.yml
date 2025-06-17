@@ -1,0 +1,134 @@
+name: Build, Push, and Deploy
+
+on:
+  push:
+    branches:
+      - main # Trigger deployment on push to the main branch
+    # Optionally, trigger on tags for versioned releases
+    # tags:
+    #   - 'v*.*.*'
+  # workflow_dispatch: # Allows manual triggering of the workflow
+
+env:
+  REGISTRY: ghcr.io
+  # Ensure image names are lowercase. github.repository is owner/repo.
+  # Replace slashes with dashes or use another strategy if owner name in image is not desired.
+  # Using format to ensure lowercase for repository owner part if it's part of the image name.
+  IMAGE_NAME_BACKEND: ${{ format('{0}/{1}', github.repository_owner, 'dentaltech-pro-backend') }}
+  # The frontend build artifact is used by Nginx, so we don't typically push a separate frontend image
+  # unless it's an Nginx image with static files bundled. The current setup builds it during deploy.sh.
+  # If we were to push a frontend builder image (less common for this setup):
+  # IMAGE_NAME_FRONTEND_BUILDER: ${{ format('{0}/{1}', github.repository_owner, 'dentaltech-pro-frontend-builder') }}
+
+jobs:
+  build-and-push-backend-image: # Renamed for clarity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # To checkout the repo
+      packages: write     # To push Docker images to GHCR
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata (tags, labels) for backend Docker image
+      id: meta_backend
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
+        tags: |
+          type=sha,prefix=,suffix=,format=short # Git SHA as a tag
+          type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }} # 'latest' tag for main branch pushes
+          # type=semver,pattern={{version}} # For version tags (e.g., v1.2.3)
+          # type=ref,event=branch
+          # type=ref,event=pr
+
+    - name: Build and push backend Docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: ./dental-api # Path to backend Dockerfile
+        push: true
+        tags: ${{ steps.meta_backend.outputs.tags }}
+        labels: ${{ steps.meta_backend.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Frontend build can happen on the server during deploy.sh via docker-compose build.
+  # If you needed to pre-build and push a frontend image (e.g., an Nginx image with static assets):
+  # build-and-push-frontend-image:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #   steps:
+  #   ... (similar to backend: login, metadata, build-push for dental-website/Dockerfile if it produces a final Nginx image)
+
+  deploy-to-production:
+    needs: build-and-push-backend-image # Depends on successful image push
+    runs-on: ubuntu-latest # Or your self-hosted runner
+    if: github.ref == 'refs/heads/main' # Deploy only on push/merge to main
+
+    steps:
+    - name: Checkout repository (for deploy script)
+      uses: actions/checkout@v4
+
+    - name: Deploy to server via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USERNAME }}
+        key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        port: ${{ secrets.PROD_SERVER_PORT || 22 }} # Default to 22 if not set
+        # Pass GITHUB_TOKEN if your deploy script needs to clone private repos or access GHCR for images from the server
+        # env:
+        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          cd /home/${{ secrets.PROD_SERVER_USERNAME }}/dentaltech-pro # Adjust to your project path on the server
+
+          # Set environment variables for the deploy script
+          # These are passed to the deploy.sh script if it sources them or they are passed as args
+          export PROD_DOMAIN="${{ secrets.PROD_DOMAIN }}"
+          export PROD_EMAIL_LETSENCRYPT="${{ secrets.PROD_EMAIL_LETSENCRYPT }}"
+          # Secrets for docker-compose.yml (e.g., POSTGRES_USER, JWT_SECRET_KEY) should ideally be in an .env file on the server
+          # or managed by the deploy script directly if secure.
+          # For example, creating a .env file on the server:
+          echo "Creating .env file for docker-compose on server..."
+          cat << EOF > .env
+          POSTGRES_USER=${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB=${{ secrets.DB_NAME }}
+          JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY_PROD }}
+          # Add other necessary env vars for docker-compose
+          EOF
+
+          log "Ensuring deploy script is executable..."
+          chmod +x ./infra/deploy.sh
+
+          log "Running deployment script..."
+          # The deploy script handles git pull, docker-compose down/build/up, certbot, etc.
+          # Pass domain and email as arguments to deploy.sh
+          ./infra/deploy.sh production \
+            --domain "${{ secrets.PROD_DOMAIN }}" \
+            --email "${{ secrets.PROD_EMAIL_LETSENCRYPT }}"
+
+          log "Deployment script finished."
+
+    - name: Clean up .env file on server (optional, if dynamically created)
+      if: always() # Run even if previous steps fail, to clean up sensitive info
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PROD_SERVER_HOST }}
+        username: ${{ secrets.PROD_SERVER_USERNAME }}
+        key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        port: ${{ secrets.PROD_SERVER_PORT || 22 }}
+        script: |
+          echo "Cleaning up temporary .env file on server..."
+          rm /home/${{ secrets.PROD_SERVER_USERNAME }}/dentaltech-pro/.env || echo ".env file not found or could not be removed."
+          echo "Cleanup complete."

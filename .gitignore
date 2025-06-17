@@ -1,0 +1,44 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Database file
+dental-api/src/database/app.db
+dental-api/database/app.db
+app.db
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE and editor directories
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*
+venv/
+env/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Frontend specific ignores (dental-website)
+dental-website/node_modules/
+dental-website/dist/
+
+# API Uploads
+dental-api/src/static/uploads/
+dental-website/.env
+dental-website/.env.*
+dental-website/coverage/
+dental-website/.DS_Store
+dental-website/*.log
+dental-website/.idea/
+dental-website/.vscode/
+!dental-website/.env.example # typically you commit an example env file
