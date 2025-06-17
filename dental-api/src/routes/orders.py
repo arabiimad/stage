@@ -1,175 +1,118 @@
-from flask import Blueprint, request, jsonify, session
-from src.models.product import Product, db
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from src.models import db
+from src.models.order import Order
+from src.models.user import User # Optional, if fetching user details for the order
 from datetime import datetime
-import uuid
 
 orders_bp = Blueprint('orders', __name__)
 
-# Simple in-memory order storage for demo purposes
-# In production, you would use a proper database table
-orders_storage = {}
-
-@orders_bp.route('/orders', methods=['POST'])
-def create_order():
-    """Create a new order from cart contents"""
+@orders_bp.route('/orders/whatsapp_checkout', methods=['POST'])
+@jwt_required(optional=True) # Allow anonymous or authenticated users
+def whatsapp_checkout():
+    """
+    Creates a new order based on WhatsApp checkout data.
+    """
     try:
         data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['customer_info', 'shipping_address']
-        if not data or not all(field in data for field in required_fields):
-            return jsonify({'error': 'Missing required fields'}), 400
-        
-        # Get cart items
-        cart_items = session.get('cart_items', [])
-        if not cart_items:
-            return jsonify({'error': 'Cart is empty'}), 400
-        
-        # Validate cart items and calculate total
-        order_items = []
-        total_amount = 0
-        
-        for item in cart_items:
-            product = Product.query.get(item['product_id'])
-            if not product or not product.is_active:
-                return jsonify({'error': f'Product {item["product_id"]} is not available'}), 400
-            
-            if product.stock_quantity < item['quantity']:
-                return jsonify({'error': f'Insufficient stock for {product.name}'}), 400
-            
-            item_total = product.price * item['quantity']
-            order_items.append({
-                'product_id': product.id,
-                'product_name': product.name,
-                'price': product.price,
-                'quantity': item['quantity'],
-                'subtotal': item_total
-            })
-            total_amount += item_total
-        
-        # Generate order ID
-        order_id = str(uuid.uuid4())
-        
-        # Create order
-        order = {
-            'id': order_id,
-            'customer_info': data['customer_info'],
-            'shipping_address': data['shipping_address'],
-            'billing_address': data.get('billing_address', data['shipping_address']),
-            'items': order_items,
-            'total_amount': total_amount,
-            'status': 'pending',
-            'created_at': datetime.utcnow().isoformat(),
-            'notes': data.get('notes', '')
+        if not data:
+            return jsonify({'error': 'Request body cannot be empty'}), 400
+
+        cart_items = data.get('cart_items')
+        total_price = data.get('total_price')
+        customer_name = data.get('customer_name')
+        whatsapp_message = data.get('whatsapp_message') # The pre-formatted message
+
+        required_fields = {
+            'cart_items': cart_items,
+            'total_price': total_price,
+            'customer_name': customer_name,
+            'whatsapp_message': whatsapp_message
         }
+
+        missing_fields = [key for key, value in required_fields.items() if value is None]
+        if missing_fields:
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
+
+        if not isinstance(cart_items, list) or not cart_items:
+            return jsonify({'error': 'cart_items must be a non-empty list'}), 400
         
-        # Store order (in production, save to database)
-        orders_storage[order_id] = order
-        
-        # Update product stock (in production, this should be in a transaction)
         for item in cart_items:
-            product = Product.query.get(item['product_id'])
-            product.stock_quantity -= item['quantity']
+            if not all(k in item for k in ['id', 'name', 'quantity', 'price']):
+                 return jsonify({'error': 'Each cart item must include id, name, quantity, and price'}), 400
+
+        if not isinstance(total_price, (int, float)) or total_price <= 0:
+            return jsonify({'error': 'total_price must be a positive number'}), 400
         
+        if not isinstance(customer_name, str) or not customer_name.strip():
+            return jsonify({'error': 'customer_name must be a non-empty string'}), 400
+
+        user_id = None
+        current_user_identity = get_jwt_identity()
+        if current_user_identity:
+            user = User.query.filter_by(id=current_user_identity).first()
+            if user:
+                user_id = user.id
+                # If user is logged in, their name can override/supplement the customer_name from form
+                # customer_name = user.username or customer_name
+            else:
+                # This case should ideally not happen if JWT is valid and refers to an existing user
+                return jsonify({'error': 'User from token not found'}), 404
+
+
+        new_order = Order(
+            user_id=user_id,
+            customer_name=customer_name,
+            items=cart_items, # Stored as JSON
+            total_amount=float(total_price),
+            status='En attente', # Default status
+            whatsapp_message_preview=whatsapp_message
+        )
+
+        db.session.add(new_order)
         db.session.commit()
-        
-        # Clear cart
-        session['cart_items'] = []
-        
+
         return jsonify({
-            'order_id': order_id,
-            'message': 'Order created successfully',
-            'order': order
+            'message': 'Order created successfully via WhatsApp checkout',
+            'order_id': new_order.id,
+            'order_details': new_order.to_dict()
         }), 201
-        
+
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        # Log the exception e for debugging
+        print(f"Error in whatsapp_checkout: {str(e)}")
+        return jsonify({'error': 'An unexpected error occurred', 'details': str(e)}), 500
 
-@orders_bp.route('/orders/<order_id>', methods=['GET'])
-def get_order(order_id):
-    """Get order details by ID"""
-    try:
-        order = orders_storage.get(order_id)
-        if not order:
-            return jsonify({'error': 'Order not found'}), 404
-        
-        return jsonify(order)
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# TODO: The following routes are from the original orders.py and used in-memory storage.
+# They need to be refactored to use the Order model and database if they are to be kept.
+# For now, they are commented out to avoid conflicts with the new db structure and focus on whatsapp_checkout.
 
-@orders_bp.route('/orders', methods=['GET'])
-def get_orders():
-    """Get all orders (for admin purposes)"""
-    try:
-        # In production, you would add authentication and authorization
-        orders = list(orders_storage.values())
-        orders.sort(key=lambda x: x['created_at'], reverse=True)
-        
-        return jsonify({
-            'orders': orders,
-            'total': len(orders)
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Simple in-memory order storage for demo purposes
+# In production, you would use a proper database table
+# orders_storage = {}
 
-@orders_bp.route('/orders/<order_id>/status', methods=['PUT'])
-def update_order_status(order_id):
-    """Update order status"""
-    try:
-        data = request.get_json()
-        
-        if not data or 'status' not in data:
-            return jsonify({'error': 'Status is required'}), 400
-        
-        valid_statuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
-        if data['status'] not in valid_statuses:
-            return jsonify({'error': 'Invalid status'}), 400
-        
-        order = orders_storage.get(order_id)
-        if not order:
-            return jsonify({'error': 'Order not found'}), 404
-        
-        order['status'] = data['status']
-        order['updated_at'] = datetime.utcnow().isoformat()
-        
-        return jsonify({
-            'message': 'Order status updated successfully',
-            'order': order
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# @orders_bp.route('/orders', methods=['POST'])
+# def create_order():
+#     """Create a new order from cart contents"""
+#     pass # Implementation removed
 
-@orders_bp.route('/contact', methods=['POST'])
-def submit_contact_form():
-    """Handle contact form submissions"""
-    try:
-        data = request.get_json()
-        
-        required_fields = ['name', 'email', 'message']
-        if not data or not all(field in data for field in required_fields):
-            return jsonify({'error': 'Missing required fields'}), 400
-        
-        # In production, you would save this to database and/or send email
-        contact_submission = {
-            'id': str(uuid.uuid4()),
-            'name': data['name'],
-            'email': data['email'],
-            'phone': data.get('phone', ''),
-            'company': data.get('company', ''),
-            'message': data['message'],
-            'submitted_at': datetime.utcnow().isoformat()
-        }
-        
-        # For demo purposes, just return success
-        return jsonify({
-            'message': 'Contact form submitted successfully',
-            'submission_id': contact_submission['id']
-        }), 201
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# @orders_bp.route('/orders/<order_id>', methods=['GET'])
+# def get_order(order_id):
+#     """Get order details by ID"""
+#     pass # Implementation removed
 
+# @orders_bp.route('/orders', methods=['GET'])
+# def get_orders():
+#     """Get all orders (for admin purposes)"""
+#     pass # Implementation removed
+
+# @orders_bp.route('/orders/<order_id>/status', methods=['PUT'])
+# def update_order_status(order_id):
+#     """Update order status"""
+#     pass # Implementation removed
+
+# @orders_bp.route('/contact', methods=['POST'])
+# def submit_contact_form():
+#    """Handle contact form submissions"""
+#    pass # Implementation removed

@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13-alpine
+    container_name: dental_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dentaluser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dentalpass}
+      POSTGRES_DB: ${POSTGRES_DB:-dentaldb}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+    networks:
+      - dentalnet
+
+  backend:
+    build:
+      context: ./dental-api
+      dockerfile: Dockerfile
+    container_name: dental_backend
+    environment:
+      FLASK_APP: src.main:app
+      FLASK_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dentaluser}:${POSTGRES_PASSWORD:-dentalpass}@postgres:5432/${POSTGRES_DB:-dentaldb}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-YourDefaultStrongSecretKeyHereChangeInProd}
+      UPLOAD_FOLDER: /app/src/static/uploads/articles
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./dental-api/src/static/uploads:/app/src/static/uploads
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+    restart: always
+    networks:
+      - dentalnet
+
+  frontend: # This service only builds the frontend, Nginx serves it
+    build:
+      context: ./dental-website
+      dockerfile: Dockerfile
+    container_name: dental_frontend_builder
+    volumes:
+      - dental-website-dist:/app/dist
+    # No ports needed as it doesn't run a server, just builds
+    networks:
+      - dentalnet
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: dental_nginx
+    ports:
+      - "80:80"
+      - "443:443" # Expose HTTPS port
+    volumes:
+      - dental-website-dist:/usr/share/nginx/html # Serve React build
+      - ./infra/nginx/default.conf:/etc/nginx/conf.d/default.conf # Main Nginx config
+      - ./infra/nginx/letsencrypt:/etc/letsencrypt # SSL certificates (read-only after populated)
+      - ./infra/nginx/certbot_webroot:/var/www/certbot # For Certbot webroot challenges
+    depends_on:
+      - backend
+      - frontend # Ensures build is complete before Nginx starts
+    restart: always
+    networks:
+      - dentalnet
+
+  certbot:
+    image: certbot/certbot
+    container_name: dental_certbot
+    volumes:
+      - ./infra/nginx/letsencrypt:/etc/letsencrypt # To store/renew certificates
+      - ./infra/nginx/certbot_webroot:/var/www/certbot # Webroot for challenges
+    # The command will be run manually or by a script for cert issuance/renewal.
+    # For docker-compose up, it can just sleep or do a dry-run renew periodically.
+    # Using sleep infinity as a placeholder, actual commands will be run via 'docker-compose run certbot ...'
+    command: sleep infinity
+    depends_on:
+      - nginx # Nginx needs to be running for some challenge types or for reload hooks
+    networks:
+      - dentalnet
+
+volumes:
+  pgdata:
+  dental-website-dist:
+
+networks:
+  dentalnet:
+    driver: bridge

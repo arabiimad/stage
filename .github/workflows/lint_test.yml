@@ -1,0 +1,114 @@
+name: Lint and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dental-api
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Install backend dependencies
+      run: pip install -r requirements.txt
+    - name: Lint with Flake8
+      run: |
+        pip install flake8
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. Default is exit_on_error=true
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  lint-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dental-website
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18' # Match your project's Node version
+    - name: Set up PNPM
+      uses: pnpm/action-setup@v3 # Use v3 or latest compatible
+      with:
+        version: 8 # Match your project's pnpm version (e.g., from package.json "packageManager")
+        run_install: false
+    - name: Get pnpm store directory
+      id: pnpm-store
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+    - name: Setup pnpm cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+    - name: Install frontend dependencies
+      run: pnpm install --frozen-lockfile
+    - name: Lint with ESLint
+      run: pnpm lint # Assumes 'lint' script exists in package.json
+
+  # test-backend:
+  #   runs-on: ubuntu-latest
+  #   needs: lint-backend # Ensure linting passes before testing
+  #   defaults:
+  #     run:
+  #       working-directory: ./dental-api
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v5
+  #     with:
+  #       python-version: '3.11'
+  #   - name: Install dependencies (including test dependencies)
+  #     run: |
+  #       pip install -r requirements.txt
+  #       pip install pytest pytest-cov # Example test dependencies
+  #   - name: Run backend tests
+  #     run: pytest # Or: python -m pytest, or pytest --cov=src tests/
+
+  # test-frontend:
+  #   runs-on: ubuntu-latest
+  #   needs: lint-frontend # Ensure linting passes before testing
+  #   defaults:
+  #     run:
+  #       working-directory: ./dental-website
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: Set up Node.js and PNPM
+  #     uses: actions/setup-node@v4
+  #     with:
+  #       node-version: '18'
+  #   - uses: pnpm/action-setup@v3
+  #     with:
+  #       version: 8
+  #       run_install: false
+  #   - name: Get pnpm store directory
+  #     id: pnpm-store-test # Unique id for this step
+  #     shell: bash
+  #     run: |
+  #       echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+  #   - name: Setup pnpm cache for tests
+  #     uses: actions/cache@v4
+  #     with:
+  #       path: ${{ steps.pnpm-store-test.outputs.STORE_PATH }}
+  #       key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }} # Can use same cache key
+  #       restore-keys: |
+  #         ${{ runner.os }}-pnpm-store-
+  #   - name: Install frontend dependencies
+  #     run: pnpm install --frozen-lockfile
+  #   - name: Run frontend tests
+  #     run: pnpm test # Assuming 'test' script exists and runs Vitest/Jest etc.
