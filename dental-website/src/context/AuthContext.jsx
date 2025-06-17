@@ -25,9 +25,10 @@ export const AuthProvider = ({ children }) => {
 
             axios.get('/auth/me')
                 .then(response => {
-                    setUser(response.data); // Assuming response.data is the user object
+                    // Backend /me route returns { user: { ... } }
+                    setUser(response.data.user);
                     setIsAuthenticated(true);
-                    // console.log("AuthContext: User loaded successfully.", response.data);
+                    // console.log("AuthContext: User loaded successfully.", response.data.user);
                 })
                 .catch(error => {
                     console.error('AuthContext: Failed to load user with stored token.', error.response || error.message);

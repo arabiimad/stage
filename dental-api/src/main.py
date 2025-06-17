@@ -29,8 +29,10 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
 app.config['JWT_SECRET_KEY'] = 'your-jwt-secret-key-please-change' # Configure JWT_SECRET_KEY
 
-# Enable CORS for all routes
-CORS(app, origins=['*'])
+# Enable CORS for specific origins
+# For development, this allows the Vite dev server (default port 5173)
+# In production, this should be configured to the actual frontend domain.
+CORS(app, origins=['http://localhost:5173'], supports_credentials=True)
 
 # Initialize JWTManager
 jwt = JWTManager(app)

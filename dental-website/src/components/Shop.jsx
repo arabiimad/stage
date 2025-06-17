@@ -133,7 +133,7 @@ const Shop = () => {
       ? product.image_url.startsWith('http')
         ? product.image_url // Already a full URL
         : `${VITE_IMAGE_BASE_URL}${product.image_url}` // Append base URL if relative path
-      : '/api/placeholder/300/300'; // Fallback placeholder
+      : '/placeholder.png'; // Updated fallback placeholder
 
     return (
     <Card className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
@@ -143,7 +143,7 @@ const Shop = () => {
             src={imageUrl}
             alt={product.name}
             className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-            onError={(e) => { e.target.onerror = null; e.target.src = '/api/placeholder/300/300'; }} // More robust fallback
+            onError={(e) => { e.target.onerror = null; e.target.src = '/placeholder.png'; }} // Updated robust fallback
           />
         </Link>
         {product.badge && (

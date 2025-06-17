@@ -1,89 +1,88 @@
-from flask import Blueprint, request, jsonify, current_app # Added current_app
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
-from src.models import db # Assuming db is in src.models.__init__
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+# Werkzeug security functions are used in the User model, not directly here
+from src.models import db
 from src.models.user import User
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/register', methods=['POST'])
-def register():
+def register_user():
     data = request.get_json()
-    username = data.get('username')
-    email = data.get('email')
-    password = data.get('password')
-    role = data.get('role', 'client') # Default role to 'client'
+    if not data or not data.get('email') or not data.get('password') or not data.get('username'):
+        return jsonify(error="Missing username, email, or password"), 400
 
-    if not username or not email or not password:
-        return jsonify({'error': 'Missing username, email, or password'}), 400 # Use 'error' key
+    email = data['email']
+    username = data['username']
+    password = data['password']
+    # Role is not taken from input, defaults to 'client' in User model
 
-    # Using a single query with OR condition is slightly more efficient
     if User.query.filter((User.email == email) | (User.username == username)).first():
-        return jsonify({'error': 'User with this email or username already exists'}), 409 # Use 'error' key
-
-    new_user = User(username=username, email=email, role=role) # Role defaults to 'client' in model if not provided
-    new_user.set_password(password) # Hashing is done in this method
+        return jsonify(error="User with this email or username already exists"), 409 # 409 for Conflict
 
     try:
+        new_user = User(
+            username=username,
+            email=email
+            # role will default to 'client' as per model definition
+        )
+        new_user.set_password(password) # Uses werkzeug via set_password in User model
+
         db.session.add(new_user)
         db.session.commit()
+
+        # Role claim is needed in JWT for @admin_required decorator to work
+        access_token = create_access_token(
+            identity=new_user.id,
+            additional_claims={'role': new_user.role}
+        )
+        # No refresh token in this specific response structure as per problem description for this task
+
+        return jsonify(
+            msg="User registered successfully", # Added success message
+            access_token=access_token,
+            user=new_user.to_dict()
+        ), 201
+
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error during registration for email {email}: {str(e)}") # Added logging
-        return jsonify({'error': 'Registration failed due to an internal error'}), 500 # Use 'error' key
-
-    # Include role in JWT claims
-    access_token = create_access_token(identity=new_user.id, additional_claims={'role': new_user.role})
-    refresh_token = create_refresh_token(identity=new_user.id, additional_claims={'role': new_user.role}) # Keep claims consistent
-
-    return jsonify({
-        'msg': 'User registered successfully', # Changed 'message' to 'msg'
-        'access_token': access_token,
-        'refresh_token': refresh_token,
-        'user': new_user.to_dict() # Return user details (excluding password hash)
-    }), 201
+        current_app.logger.error(f"Error during registration for {email}: {str(e)}")
+        return jsonify(error="Registration failed due to an internal server error"), 500
 
 @auth_bp.route('/login', methods=['POST'])
-def login():
+def login_user():
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    if not data or not data.get('email') or not data.get('password'):
+        return jsonify(error="Missing email or password"), 400
 
-    if not email or not password:
-        return jsonify({'error': 'Missing email or password'}), 400 # Use 'error' key
+    email = data['email']
+    password = data['password']
 
     user = User.query.filter_by(email=email).first()
 
-    if user and user.check_password(password):
-        # Include role in JWT claims
-        access_token = create_access_token(identity=user.id, additional_claims={'role': user.role})
-        refresh_token = create_refresh_token(identity=user.id, additional_claims={'role': user.role})
-        return jsonify({
-            'msg': 'Login successful', # Use 'msg' key for success
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'user': user.to_dict()
-        }), 200
-    else:
-        return jsonify({'error': 'Invalid email or password'}), 401 # Use 'error' key, more generic message
+    if not user or not user.check_password(password): # check_password uses werkzeug
+        return jsonify(error="Invalid credentials"), 401
 
-@auth_bp.route('/refresh', methods=['POST'])
-@jwt_required(refresh=True)
-def refresh():
-    current_user_id = get_jwt_identity()
-    claims = get_jwt()
-    current_user_role = claims.get('role', 'client') # Get role from existing refresh token
+    # Role claim is needed in JWT for @admin_required decorator to work
+    access_token = create_access_token(
+        identity=user.id,
+        additional_claims={'role': user.role}
+    )
+    # No refresh token in this specific response structure
 
-    # Create new access token with the same identity and role
-    access_token = create_access_token(identity=current_user_id, additional_claims={'role': current_user_role})
-    return jsonify({'access_token': access_token}), 200
+    return jsonify(
+        msg="Login successful", # Added success message
+        access_token=access_token,
+        user=user.to_dict()
+    ), 200
 
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
-def me():
+def get_me():
     current_user_id = get_jwt_identity()
     user = User.query.get(current_user_id)
-    if user:
-        return jsonify(user.to_dict()), 200
-    else:
-        # This case should ideally not be reached if JWT is valid and refers to an existing user
-        return jsonify({'message': 'User not found'}), 404
+
+    if not user:
+        return jsonify(error="User not found"), 404
+
+    return jsonify(user=user.to_dict()), 200

@@ -13,12 +13,18 @@ const Header = ({ isScrolled, onCartClick }) => {
   const navigate = useNavigate();
   const { getTotalItems } = useCart();
   const totalItems = getTotalItems();
+  const { getTotalItems } = useCart();
+  const totalItems = getTotalItems();
   const { isAuthenticated, user, logout, loading } = useAuth(); // Get auth state and functions
 
-  // Determine if we are on a page where shop/auth elements should be visible
-  const showShopAndAuthElements = location.pathname.startsWith('/boutique') ||
-                                location.pathname.startsWith('/mon-compte') ||
-                                location.pathname.startsWith('/product'); // Product detail pages are part of boutique experience
+  // Refined visibility logic based on specific feedback for cart icon
+  const showCartIcon = location.pathname.startsWith('/boutique') ||
+                       location.pathname.startsWith('/product');
+
+  // Auth links might still be relevant on /mon-compte even if cart is not
+  const showAuthLinks = location.pathname.startsWith('/boutique') ||
+                        location.pathname.startsWith('/mon-compte') ||
+                        location.pathname.startsWith('/product');
 
 
   const navItems = [
@@ -123,53 +129,51 @@ const Header = ({ isScrolled, onCartClick }) => {
                 Boutique
               </Link>
 
-              {showShopAndAuthElements && (
-                <>
-                  {/* Cart Button */}
-                  <button
-                    onClick={onCartClick}
-                    onKeyDown={(e) => handleKeyDown(e, onCartClick)}
-                    className={`relative p-2 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${commonLinkClasses}`}
-                    aria-label={`Panier d'achat, ${totalItems} article${totalItems !== 1 ? 's' : ''}`}
-                  >
-                    <ShoppingBag className="w-6 h-6" />
-                    {totalItems > 0 && (
-                      <span
-                        className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
-                      >
-                        {totalItems}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Auth Links Desktop */}
-                  {!loading && (
-                    isAuthenticated ? (
-                      <>
-                        {user?.role === 'admin' && (
-                          <Link to="/admin/dashboard" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center text-red-500 hover:text-red-700`}>
-                            <ShieldCheck className="w-5 h-5 mr-1" /> Admin
-                          </Link>
-                        )}
-                        <Link to="/mon-compte" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
-                          <UserCircle className="w-5 h-5 mr-1" /> {user?.username || 'Mon Compte'}
-                        </Link>
-                        <Button onClick={handleLogout} variant="outline" size="sm" className={`${isScrolled ? 'text-gray-700 border-gray-300 hover:bg-gray-100' : 'text-white border-white/50 hover:bg-white/10'}`}>
-                          <LogOut className="w-4 h-4 mr-1" /> Déconnexion
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Link to="/login" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
-                          <LogIn className="w-5 h-5 mr-1" /> Connexion
-                        </Link>
-                        <Link to="/register" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
-                          <UserPlus className="w-5 h-5 mr-1" /> Inscription
-                        </Link>
-                      </>
-                    )
+              {/* Cart Button - visibility controlled by showCartIcon */}
+              {showCartIcon && (
+                <button
+                  onClick={onCartClick}
+                  onKeyDown={(e) => handleKeyDown(e, onCartClick)}
+                  className={`relative p-2 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${commonLinkClasses}`}
+                  aria-label={`Panier d'achat, ${totalItems} article${totalItems !== 1 ? 's' : ''}`}
+                >
+                  <ShoppingBag className="w-6 h-6" />
+                  {totalItems > 0 && (
+                    <span
+                      className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                    >
+                      {totalItems}
+                    </span>
                   )}
-                </>
+                </button>
+              )}
+
+              {/* Auth Links Desktop - visibility controlled by showAuthLinks */}
+              {showAuthLinks && !loading && (
+                isAuthenticated ? (
+                  <>
+                    {user?.role === 'admin' && (
+                      <Link to="/admin/dashboard" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center text-red-500 hover:text-red-700`}>
+                        <ShieldCheck className="w-5 h-5 mr-1" /> Admin
+                      </Link>
+                    )}
+                    <Link to="/mon-compte" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
+                      <UserCircle className="w-5 h-5 mr-1" /> {user?.username || 'Mon Compte'}
+                    </Link>
+                    <Button onClick={handleLogout} variant="outline" size="sm" className={`${isScrolled ? 'text-gray-700 border-gray-300 hover:bg-gray-100' : 'text-white border-white/50 hover:bg-white/10'}`}>
+                      <LogOut className="w-4 h-4 mr-1" /> Déconnexion
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
+                      <LogIn className="w-5 h-5 mr-1" /> Connexion
+                    </Link>
+                    <Link to="/register" className={`${commonButtonBaseClasses} ${commonLinkClasses} flex items-center`}>
+                      <UserPlus className="w-5 h-5 mr-1" /> Inscription
+                    </Link>
+                  </>
+                )
               )}
             </div>
 
@@ -214,13 +218,15 @@ const Header = ({ isScrolled, onCartClick }) => {
                     <ShoppingBag className="w-5 h-5 inline mr-2" /> Boutique
                   </Link>
                 </li>
-                {showShopAndAuthElements && (
-                  <>
+                {showCartIcon && (
                     <li role="none">
                       <button onClick={onCartClick} className="flex items-center w-full text-left px-4 py-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg" role="menuitem">
                         <ShoppingBag className="w-5 h-5 mr-2" /> Panier ({totalItems})
                       </button>
                     </li>
+                )}
+                {showAuthLinks && (
+                  <>
                     <hr className="my-2"/>
                     {/* Auth Links Mobile */}
                     {!loading && (
